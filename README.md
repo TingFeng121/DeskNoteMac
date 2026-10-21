@@ -17,6 +17,28 @@
 - **开机自动启动**（`SMAppService` 登录项）
 - 深/浅主题、窗口透明度、字号可调
 
+## 界面
+
+事项板，深色与浅色两套主题：
+
+![事项板：类别 → 项目 → 事项三层，右侧是 Deadline](docs/screenshots/board.png)
+![事项板（浅色）](docs/screenshots/board-light.png)
+
+便签页。列表模式左边是按日期分组的清单、右边就地编辑；语法符号只在敲的时候显形，按 Tab 两格一级往里缩：
+
+![列表模式：Markdown 编辑器与层级缩进](docs/screenshots/notes-editor.png)
+
+卡片墙模式，等高卡片：
+
+![卡片墙](docs/screenshots/notes-gallery.png)
+
+钉在桌面层的便签，和常驻桌面的待办面板：
+
+![钉在桌面的便签](docs/screenshots/sticky.png)
+![桌面待办面板](docs/screenshots/panel.png)
+
+> 上面几张图全部出自 `--demo` 演示实例，内容是 `Sources/DeskNote/Demo.swift` 里写死的示例数据，跟任何人的真实笔记无关。
+
 ## 构建
 
 ```bash
@@ -31,6 +53,20 @@ open build/桌面便签.app
 ```bash
 swift build -c release
 ```
+
+### 演示实例与出图
+
+不想拿自己的数据试界面，或者要重跑 README 里那几张截图：
+
+```bash
+# 演示：数据文件指到临时目录、偏好走独立 suite，钥匙串 / 系统通知 / 全局热键 / 触发角 / 备份一概不碰
+./build/桌面便签.app/Contents/MacOS/DeskNote --demo
+
+# 出图：把各界面离屏渲染成 PNG 后退出，窗口一次都不会上屏
+./build/桌面便签.app/Contents/MacOS/DeskNote --demo --shots /tmp/shots
+```
+
+示例数据写死在 `Sources/DeskNote/Demo.swift` 的 `DemoData.board()`，改完重跑一遍命令就是新图。
 
 ### 关于签名
 
@@ -73,6 +109,7 @@ Sources/DeskNote/
   MarkdownText.swift       只读渲染
   HotCorner.swift          触发角探针 + 全局热键
   Notifier.swift           系统通知
+  Demo.swift               --demo 演示实例：示例数据 + 离屏出图
   Helpers.swift            布局常量、日期格式、配色、登录项
 Resources/                 图标（AppIcon-1024.png 与生成的 .icns）
 Tools/make-iconset.swift   从 PNG 生成 icns

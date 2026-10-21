@@ -7,6 +7,13 @@ final class FloatingWindow: NSWindow {
     override var canBecomeMain: Bool { true }
 }
 
+/// AppKit 的窗口位置记忆走的是 `UserDefaults.standard`，演示实例一旦挂上 autosave，
+/// 就会把用户自己摆好的窗口位置覆盖掉——所以 demo 下不挂，直接摆到屏幕中间。
+func setWindowFrameAutosave(_ window: NSWindow, _ name: String) {
+    guard AppEnv.demo else { window.setFrameAutosaveName(name); return }
+    window.center()
+}
+
 private func makeFloatingWindow(size: NSSize, autosave: String, resizable: Bool = false,
                                 trafficLights: Bool = false) -> FloatingWindow {
     var mask: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
@@ -32,7 +39,7 @@ private func makeFloatingWindow(size: NSSize, autosave: String, resizable: Bool 
     win.backgroundColor = .clear
     win.isOpaque = false
     win.hasShadow = true
-    win.setFrameAutosaveName(autosave)
+    setWindowFrameAutosave(win, autosave)
     win.contentView?.wantsLayer = true
     win.contentView?.layer?.cornerRadius = 14
     win.contentView?.layer?.masksToBounds = true
@@ -115,8 +122,8 @@ final class NoteWindowController: NSObject, NSWindowDelegate {
     /// 默认宽度；只此一次，之后用户自己拖出来的尺寸照旧全部记住。
     private func widenForThreeColumnsOnce() {
         let key = "mainWindowWidenedForThreeColumns"
-        guard !UserDefaults.standard.bool(forKey: key) else { return }
-        UserDefaults.standard.set(true, forKey: key)
+        guard !AppEnv.defaults.bool(forKey: key) else { return }
+        AppEnv.defaults.set(true, forKey: key)
         guard window.frame.width < NoteLayout.mainSize.width else { return }
         var frame = window.frame
         let top = frame.maxY
@@ -153,7 +160,7 @@ final class SettingsWindowController {
             win.contentView = NSHostingView(rootView: SettingsView())
             win.contentMinSize = NSSize(width: 320, height: 260)
             win.isReleasedWhenClosed = false
-            win.setFrameAutosaveName("NoteSettingsWindow")
+            setWindowFrameAutosave(win, "NoteSettingsWindow")
             // autosave 里没有才居中，否则每次打开都跑回屏幕中间，用户摆的位置白记了
             if !win.setFrameUsingName("NoteSettingsWindow") { win.center() }
             window = win

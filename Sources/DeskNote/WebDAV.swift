@@ -21,6 +21,8 @@ enum SecretStore {
 
     static func read() -> String {
         if let cache { return cache }
+        // 演示实例不敲钥匙串：一个授权框就能把整轮后台截图卡死
+        if AppEnv.demo { return "" }
         var query = base
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
@@ -37,6 +39,7 @@ enum SecretStore {
 
     static func write(_ value: String) {
         cache = value
+        guard !AppEnv.demo else { return }
         if value.isEmpty {
             SecItemDelete(base as CFDictionary)
             return
@@ -301,7 +304,7 @@ final class BackupManager {
     }
 
     private func lastBackupStatus() -> String {
-        guard let at = UserDefaults.standard.object(forKey: "webdavLastBackupAt") as? TimeInterval else {
+        guard let at = AppEnv.defaults.object(forKey: "webdavLastBackupAt") as? TimeInterval else {
             return "还没备份过"
         }
         return "上次备份 \(DateFmt.relative(Date(timeIntervalSince1970: at)))"
@@ -329,12 +332,12 @@ final class BackupManager {
 
     /// 记下「远端已经有这一份内容了」。恢复完也要记，否则这一份会被当成"新改动"再推一遍
     private func markBackedUp(revision: Int) {
-        UserDefaults.standard.set(revision, forKey: Self.revisionKey)
+        AppEnv.defaults.set(revision, forKey: Self.revisionKey)
     }
 
     /// 自上次成功备份以来到底改没改。没备过（键不存在）一律算"有改动"。
     private var hasChanges: Bool {
-        let last = UserDefaults.standard.object(forKey: Self.revisionKey) as? Int
+        let last = AppEnv.defaults.object(forKey: Self.revisionKey) as? Int
         return last == nil || last! != Store.shared.revision
     }
 
@@ -376,7 +379,7 @@ final class BackupManager {
             let name = Self.fileName(Date())
             try await client.upload(name: name, data: raw)
             markBackedUp(revision: revision)
-            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "webdavLastBackupAt")
+            AppEnv.defaults.set(Date().timeIntervalSince1970, forKey: "webdavLastBackupAt")
             // 先按保留份数清理再列目录，否则界面会留着几行点一下就 404 的副本
             try? await client.prune(keep: settings.webdavKeepCount)
             backups = (try? await client.list()) ?? backups

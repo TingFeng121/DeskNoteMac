@@ -22,6 +22,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // 演示实例：只开界面，不占热键、不挂触发角、不排通知、不碰钥匙串和自动备份
+        if AppEnv.demo {
+            NSApp.setActivationPolicy(.accessory)
+            if let dir = DemoShots.destination {
+                DemoShots.run(into: dir)
+                NSApp.terminate(nil)
+                return
+            }
+            mainWindow = NoteWindowController()
+            mainWindow.show()
+            return
+        }
         NSApp.setActivationPolicy(.regular)
         setupMainMenu()
         setupStatusItem()
@@ -174,7 +186,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// 热键只在开关真的翻动时注册/注销。关掉却不注销的话，设置里明明写着不开启，
     /// ⌥⌘N 还是会弹便签；注册失败的原因留给设置页显示（多半是这组合键被别的程序占了）。
     @MainActor private func applyGlobalHotKey() {
-        guard hotKeyWanted != settings.globalHotKeyEnabled else { return }
+        guard !AppEnv.demo, hotKeyWanted != settings.globalHotKeyEnabled else { return }
         hotKeyWanted = settings.globalHotKeyEnabled
         if hotKeyWanted {
             settings.globalHotKeyError = GlobalHotKeys.shared.enableNewNote()
@@ -187,7 +199,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// force 给启动、App 被激活、屏幕参数变了这三种场合用：角落没变但辅助功能授权
     /// 可能是刚勾上的，得让 watcher 重新读一次授权状态。
     @MainActor private func applyHotCorner(force: Bool = false) {
-        guard force || settings.hotCorner != hotCornerInstalled else { return }
+        guard !AppEnv.demo, force || settings.hotCorner != hotCornerInstalled else { return }
         hotCornerInstalled = settings.hotCorner
         settings.hotCornerError = HotCornerWatcher.shared.apply(settings.hotCorner)
     }

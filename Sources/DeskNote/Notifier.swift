@@ -16,6 +16,7 @@ enum Notifier {
     private static var scheduled: [String: Pending] = [:]
 
     static func setup() {
+        guard !AppEnv.demo else { return }
         let center = UNUserNotificationCenter.current()
         center.delegate = presenter
         center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
@@ -23,6 +24,7 @@ enum Notifier {
 
     /// 每个 Deadline 只排一条通知：到点那一分钟提醒，不再提前、也不再过期补发。
     static func sync(_ store: Store) {
+        guard !AppEnv.demo else { return }
         let wanted = desired(store)
         let center = UNUserNotificationCenter.current()
         let stale = scheduled.keys.filter { wanted[$0] == nil }

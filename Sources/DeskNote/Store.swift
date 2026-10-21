@@ -13,7 +13,7 @@ final class Store {
     /// 改动流水号：每动一次加一格，跟着落盘一起持久化。自动备份靠它判断
     /// 「自上次备份以来到底改没改」——比对 JSON 字节是不行的，同一个值两次
     /// encode 出来的键序都不一样（实测 200 次能得 160 种结果）。
-    private(set) var revision = UserDefaults.standard.integer(forKey: "dataRevision")
+    private(set) var revision = AppEnv.defaults.integer(forKey: "dataRevision")
     private var saveTimer: Timer?
     /// 本轮改动里第一次排入存盘的时刻，用来给防抖兜一个上限
     private var pendingSince: Date?
@@ -33,14 +33,15 @@ final class Store {
 
     var canUndoDelete: Bool { undoSnapshot != nil }
 
-    static var fileURL: URL {
-        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("DeskNote", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("data.json")
-    }
+    static var fileURL: URL { AppEnv.dataURL }
 
     init() {
+        // 演示实例每次启动都回示例数据：临时目录里那份不该带着上一轮的改动
+        if AppEnv.demo {
+            data = DemoData.board()
+            save()
+            return
+        }
         load()
         if data.categories.isEmpty {
             data.categories = [
@@ -103,7 +104,7 @@ final class Store {
         guard let raw = try? JSONEncoder().encode(data) else { return }
         try? raw.write(to: Self.fileURL, options: .atomic)
         // 跟着数据一起落盘：崩在防抖里没写出去的话，流水号也不会凭空多走一格
-        UserDefaults.standard.set(revision, forKey: "dataRevision")
+        AppEnv.defaults.set(revision, forKey: "dataRevision")
     }
 
     /// 从远端备份整盘恢复：先把本地这份复制成 data.json.bak，恢复错了还能手动回退

@@ -125,7 +125,7 @@ final class StickyNoteWindowController: NSObject, NSWindowDelegate {
         window.isReleasedWhenClosed = false
         window.delegate = self
         window.contentMinSize = NSSize(width: 200, height: NoteLayout.stickyMinHeight)
-        window.setFrameAutosaveName("StickyNote-\(noteID.uuidString)")
+        setWindowFrameAutosave(window, "StickyNote-\(noteID.uuidString)")
         window.titlebarSeparatorStyle = .none
         window.contentView?.wantsLayer = true
         window.contentView?.layer?.cornerRadius = 14

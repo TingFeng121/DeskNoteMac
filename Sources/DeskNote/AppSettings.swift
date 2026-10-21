@@ -18,7 +18,7 @@ enum NoteTheme: String, CaseIterable, Codable, Identifiable {
 final class AppSettings {
     static let shared = AppSettings()
 
-    private let defaults = UserDefaults.standard
+    private let defaults = AppEnv.defaults
 
     // 每个键只写自己：整表 persist 的话，拖一次透明度滑块就是上百次多余写入。
     // 也只有真的需要 AppKit 侧（窗口透明度、外观、面板开关）响应的键才发通知。
