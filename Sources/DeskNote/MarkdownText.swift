@@ -27,20 +27,31 @@ enum NoteBlock: Identifiable {
     var id: Int { line }
 }
 
+/// 一行正文：块类型 + 它在第几级缩进上。层级和编辑器里 Tab 一步一级用的是同一套算法
+struct NoteLine: Identifiable {
+    let block: NoteBlock
+    let depth: Int
+    var id: Int { block.line }
+}
+
 /// 只做块级解析，行内交给系统自带的 Markdown 解析器（加粗/斜体/行内代码/删除线都免费）
 enum MarkdownText {
-    static func blocks(from text: String) -> [NoteBlock] {
-        var out: [NoteBlock] = []
+    static func blocks(from text: String) -> [NoteLine] {
+        var out: [NoteLine] = []
         var inCode = false
         var codeStart = 0
         var codeLines: [String] = []
+
+        func add(_ block: NoteBlock, depth: Int = 0) {
+            out.append(NoteLine(block: block, depth: depth))
+        }
 
         for (index, raw) in text.components(separatedBy: "\n").enumerated() {
             let trimmed = raw.trimmingCharacters(in: .whitespaces)
 
             if trimmed.hasPrefix("```") {
                 if inCode {
-                    out.append(.code(text: codeLines.joined(separator: "\n"), line: codeStart))
+                    add(.code(text: codeLines.joined(separator: "\n"), line: codeStart))
                     codeLines = []
                     inCode = false
                 } else {
@@ -50,14 +61,15 @@ enum MarkdownText {
                 continue
             }
             if inCode {
+                // 代码里的空白是代码本身的内容，不拿来当层级
                 codeLines.append(raw)
                 continue
             }
             if trimmed.isEmpty { continue }
-            out.append(block(of: trimmed, line: index))
+            add(block(of: trimmed, line: index), depth: MarkdownSyntax.depth(ofLine: raw))
         }
         if inCode {
-            out.append(.code(text: codeLines.joined(separator: "\n"), line: codeStart))
+            add(.code(text: codeLines.joined(separator: "\n"), line: codeStart))
         }
         return out
     }
@@ -139,9 +151,11 @@ struct NoteBodyView: View {
                     .font(.system(size: fontSize))
                     .foregroundStyle(.tertiary)
             }
-            ForEach(all) { block in
-                NoteBlockRow(block: block, fontSize: fontSize,
+            ForEach(all) { line in
+                NoteBlockRow(block: line.block, fontSize: fontSize,
                              interactive: interactive, onToggle: onToggle)
+                    // 和编辑器里的段落缩进同一步长，卡片上看到的层级才是打字时看到的那个
+                    .padding(.leading, CGFloat(line.depth) * MarkdownStyle.indentStep)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
