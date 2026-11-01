@@ -26,7 +26,7 @@ struct SettingsView: View {
             .pickerStyle(.segmented)
 
             VStack(alignment: .leading) {
-                Text("透明度 \(Int(settings.opacity * 100))%")
+                Text("便签与桌面组件透明度 \(Int(settings.opacity * 100))%")
                 Slider(value: $settings.opacity, in: 0.55...1.0)
             }
 

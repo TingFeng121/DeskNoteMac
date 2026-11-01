@@ -96,6 +96,8 @@ enum NoteSection: Hashable {
     case all
     case done
     case notes
+    /// Markdown 库：磁盘上的 .md 文件本身
+    case library
     case category(UUID)
 
     var rawValue: String {
@@ -103,6 +105,7 @@ enum NoteSection: Hashable {
         case .all: return "all"
         case .done: return "done"
         case .notes: return "notes"
+        case .library: return "library"
         case .category(let id): return "category:\(id.uuidString)"
         }
     }
@@ -111,6 +114,7 @@ enum NoteSection: Hashable {
         if rawValue == "all" { self = .all; return }
         if rawValue == "done" { self = .done; return }
         if rawValue == "notes" { self = .notes; return }
+        if rawValue == "library" { self = .library; return }
         let prefix = "category:"
         guard rawValue.hasPrefix(prefix),
               let id = UUID(uuidString: String(rawValue.dropFirst(prefix.count))) else { return nil }

@@ -25,6 +25,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         // 演示实例：只开界面，不占热键、不挂触发角、不排通知、不碰钥匙串和自动备份
         if AppEnv.demo {
             NSApp.setActivationPolicy(.accessory)
+            // 演示库每次启动都清空：上一次 --vault-selftest 留在临时目录里的 state.json
+            // 会让第一次 Store.save() 顺手跑一轮同步，出图时就多一条不该有的横幅。
+            try? FileManager.default.removeItem(at: AppEnv.vaultURL)
+            // 库同步的端到端自检：跑完直接退，一次窗口都不上屏
+            if VaultSelfTest.requested {
+                VaultSelfTest.run()
+                return
+            }
             if let dir = DemoShots.destination {
                 DemoShots.run(into: dir)
                 NSApp.terminate(nil)
@@ -44,6 +52,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         mainWindow = NoteWindowController()
         mainWindow.show()
         StickyWindowManager.shared.syncPinned()
+        // 库建过才挂事件流；没建过 activeRoot 是 nil，restart 就是空转
+        Store.shared.pullFromVault()
+        VaultWatcher.shared.restart()
 
         applyDesktopPanel()
         applyGlobalHotKey()
@@ -77,6 +88,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     func applicationDidResignActive(_ notification: Notification) {
         // 防抖里可能还压着最后一次编辑，切走之前先落干净
+        LibraryDocument.shared.save()
         Store.shared.flush()
     }
 
@@ -86,7 +98,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         applyHotCorner(force: true)
     }
 
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        LibraryDocument.shared.save() ? .terminateNow : .terminateCancel
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
+        LibraryDocument.shared.save()
         Store.shared.flush()
     }
 

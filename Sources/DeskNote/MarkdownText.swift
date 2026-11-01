@@ -117,7 +117,7 @@ enum MarkdownText {
     private static func heading(_ t: String) -> (Int, String)? {
         var rest = Substring(t)
         var level = 0
-        while rest.first == "#", level < 3 {
+        while rest.first == "#", level < 6 {
             rest = rest.dropFirst()
             level += 1
         }
@@ -172,7 +172,7 @@ private struct NoteBlockRow: View {
         switch block {
         case let .heading(level, text, _):
             Text(MarkdownText.inline(text))
-                .font(.system(size: fontSize + (level == 1 ? 5 : level == 2 ? 3 : 1), weight: .bold))
+                .font(.system(size: fontSize + headingSizeOffset(level), weight: .bold))
                 .fixedSize(horizontal: false, vertical: true)
 
         case let .todo(text, done, line):
@@ -239,5 +239,16 @@ private struct NoteBlockRow: View {
     private func lineText(_ text: String) -> some View {
         Text(MarkdownText.inline(text)).font(.system(size: fontSize))
             .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func headingSizeOffset(_ level: Int) -> Double {
+        switch level {
+        case 1: return 5
+        case 2: return 3
+        case 3: return 1
+        case 4: return 0
+        case 5: return -1
+        default: return -2
+        }
     }
 }

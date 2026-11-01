@@ -16,6 +16,7 @@ func confirmAndRemoveCategory(_ category: Category) {
 struct RootView: View {
     @State private var store = Store.shared
     @State private var settings = AppSettings.shared
+    @State private var library = LibraryModel.shared
     @State private var query = ""
     @FocusState private var searchFocused: Bool
     // 类别详情页顶部的就地改名：这一页不用 CategoryBlock，认领信号得自己接
@@ -36,6 +37,9 @@ struct RootView: View {
                     Divider().opacity(0.4)
                     if settings.section == .notes {
                         NotesBrowserView(query: query)
+                    } else if settings.section == .library {
+                        // 库工作区自己管理文件树与正文的滚动
+                        LibraryView(query: query)
                     } else {
                         contentScroll
                     }
@@ -59,6 +63,7 @@ struct RootView: View {
             Button("") { settings.section = .all }.keyboardShortcut("1")
             Button("") { settings.section = .done }.keyboardShortcut("2")
             Button("") { settings.section = .notes }.keyboardShortcut("3")
+            Button("") { settings.section = .library }.keyboardShortcut("4")
             Button("") { AppDelegate.shared?.hideMainWindow() }.keyboardShortcut("w")
         }
         .opacity(0)
@@ -105,6 +110,9 @@ struct RootView: View {
             case .done:
                 doneList
             case .notes:
+                EmptyView()
+            case .library:
+                // 库页不走这条滚动路径，它自己接管整块内容区
                 EmptyView()
             case .category(let id):
                 if let category = store.category(id) {
@@ -225,11 +233,21 @@ struct RootView: View {
                          settings.sidebarCollapsed ? "展开类别栏" : "收起类别栏") {
                 settings.sidebarCollapsed.toggle()
             }
-            Image(systemName: "note.text")
+            Image(systemName: settings.section == .library ? "folder" : "note.text")
                 .foregroundStyle(.tint)
-            Text("便签").font(.system(size: fontSize + 1, weight: .bold))
-            // 事项计数在便签页里对不上号，张数由下面的工具栏报
-            if settings.section != .notes {
+            Text(settings.section == .library ? "库" : "便签")
+                .font(.system(size: fontSize + 1, weight: .bold))
+            // 事项计数在便签页里对不上号，张数由下面的工具栏报；库页报的是文件数和要处理的处数
+            if settings.section == .library {
+                // 只有冲突真的等人拍板：磁盘改和便签改，同步层下一轮自己收掉，别拿它们吓人
+                let mine = library.rows.filter(\.needsYou).count
+                Text("\(library.rows.count) 个文件" + (mine > 0 ? " · \(mine) 份冲突要你拍板" : ""))
+                    .font(.system(size: fontSize - 2))
+                    .foregroundStyle(mine > 0 ? Color.alertInk : Color.secondary)
+                    .help(mine > 0
+                          ? "两边都改过的那几份：磁盘那份已经另存成「冲突 …」副本，留哪个由你定"
+                          : "库里的 Markdown 可以直接阅读、编辑或分屏预览；文件保存在本地")
+            } else if settings.section != .notes {
                 Text("\(store.openCount) 待完成 · \(store.doneCount) 已完成")
                     .font(.system(size: fontSize - 2))
                     .foregroundStyle(.secondary)
@@ -258,12 +276,20 @@ struct RootView: View {
         .help(help)
     }
 
+    private var searchPlaceholder: String {
+        switch settings.section {
+        case .notes: return "搜索便签内容"
+        case .library: return "搜索库内文件与正文"
+        default: return "搜索事项、项目名称"
+        }
+    }
+
     private var searchBar: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: fontSize - 2))
                 .foregroundStyle(.secondary)
-            TextField(settings.section == .notes ? "搜索便签内容" : "搜索事项、项目名称", text: $query)
+            TextField(searchPlaceholder, text: $query)
                 .textFieldStyle(.plain)
                 .font(.system(size: fontSize - 1))
                 .focused($searchFocused)

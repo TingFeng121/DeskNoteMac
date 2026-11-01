@@ -1,0 +1,329 @@
+/*
+ DeskNote 富阅读层的样式。
+ 只做两件事：把 markdown 的结构排好，把颜色对齐 App 自己的令牌（DESIGN.md 的 panel / meta-ink /
+ warn / alert / sync 那几支）。颜色由 Swift 侧随每次渲染送进来（--panel、--ink、--meta、--accent），
+ 所以这里不写死某一套主题，深色浅色都走同一份文件。
+*/
+
+:root {
+  --panel: #f7f7f5;
+  --ink: #1d1d1f;
+  --meta: #61615e;
+  --accent: #3d7869;
+  --hairline: rgba(0, 0, 0, 0.10);
+  --code-bg: rgba(0, 0, 0, 0.045);
+  --quote-bar: rgba(0, 0, 0, 0.16);
+  --note-size: 14px;
+}
+
+html[data-tone="dark"] {
+  --hairline: rgba(255, 255, 255, 0.14);
+  --code-bg: rgba(255, 255, 255, 0.07);
+  --quote-bar: rgba(255, 255, 255, 0.22);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--panel);
+  color: var(--ink);
+}
+
+body {
+  font: 400 var(--note-size)/1.62 -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-wrap: anywhere;
+}
+
+#note-body {
+  max-width: 720px;
+  margin: 0;
+  padding: 18px 22px 56px;
+}
+
+/* 空态：和原生阅读器一样，只说一句它是什么，不摆占位插画 */
+#note-body.is-empty {
+  color: var(--meta);
+  font-size: calc(var(--note-size) - 1px);
+}
+
+/* ---------- 结构 ---------- */
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 650;
+  line-height: 1.28;
+  margin: 1.5em 0 0.5em;
+}
+h1 { font-size: 1.62em; margin-top: 0.4em; }
+h2 { font-size: 1.34em; }
+h3 { font-size: 1.16em; }
+h4 { font-size: 1.04em; }
+h5 { font-size: 0.96em; color: var(--meta); }
+h6 { font-size: 0.9em; color: var(--meta); }
+
+p { margin: 0 0 0.85em; }
+ul, ol { margin: 0 0 0.85em; padding-left: 1.5em; }
+li { margin: 0.18em 0; }
+li > ul, li > ol { margin: 0.2em 0 0; }
+li::marker { color: var(--meta); }
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--hairline);
+  margin: 1.6em 0;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+/* SVG 附件读不进来（Swift 侧挡 public.svg-image），用一句实话代替破图 */
+.desknote-unsupported { color: var(--meta); font-style: italic; }
+
+strong { font-weight: 650; }
+em { font-style: italic; }
+del { color: var(--meta); }
+
+blockquote {
+  margin: 0 0 0.85em;
+  padding: 0.1em 0 0.1em 0.7em;
+  border-left: 2px solid var(--quote-bar);
+  color: var(--meta);
+}
+blockquote > :last-child { margin-bottom: 0; }
+
+img { max-width: 100%; height: auto; border-radius: 3px; }
+/* 图读不到时 WebKit 会给个破图标，这里换成一句实话 */
+img.desknote-img { background: var(--code-bg); }
+
+/* 图片缩放：外包一层固定宽度的框，右下角挂一个拖拽把手，
+   跟原生阅读器 ResizableImageFrame 同一套手感（只改视图宽度，不落盘正文） */
+.desknote-img-frame {
+  display: block;
+  position: relative;
+  max-width: 100%;
+  margin: 0.5em 0;
+  line-height: 0;
+}
+.desknote-img-frame > img.desknote-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+.desknote-img-resize {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--meta);
+  cursor: nwse-resize;
+  opacity: 0.5;
+  transition: opacity 0.15s ease;
+}
+html[data-tone="dark"] .desknote-img-resize { background: rgba(40, 40, 40, 0.82); }
+.desknote-img-frame:hover > .desknote-img-resize { opacity: 1; }
+.desknote-img-resize svg { width: 12px; height: 12px; display: block; pointer-events: none; }
+
+kbd {
+  font: 0.9em/1 ui-monospace, "SF Mono", Menlo, monospace;
+  padding: 2px 5px;
+  border: 1px solid var(--hairline);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+}
+
+/* ---------- 代码 ---------- */
+
+code, pre {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: calc(var(--note-size) - 1px);
+}
+:not(pre) > code {
+  background: var(--code-bg);
+  padding: 0.1em 0.34em;
+  border-radius: 3px;
+}
+pre.desknote-code {
+  margin: 0 0 0.95em;
+  padding: 10px 12px;
+  background: var(--code-bg);
+  border-radius: 5px;
+  overflow-x: auto;
+  line-height: 1.5;
+  -webkit-user-select: text;
+  user-select: text;
+}
+pre.desknote-code code { background: none; padding: 0; }
+
+/* highlight.js 的 token 类自己上色，不引第三方主题：颜色得跟面板说话 */
+.hljs-comment, .hljs-quote { color: var(--meta); font-style: italic; }
+.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-doctag { color: #a62c8f; }
+.hljs-string, .hljs-regexp, .hljs-addition { color: #2f6f42; }
+.hljs-number, .hljs-variable, .hljs-template-variable, .hljs-type { color: #8a5a1d; }
+.hljs-function .hljs-title, .hljs-title.function_, .hljs-section { color: #2a5d9f; }
+.hljs-class .hljs-title, .hljs-title.class_, .hljs-built_in { color: #2a5d9f; }
+.hljs-attr, .hljs-attribute, .hljs-property { color: #8a5a1d; }
+.hljs-meta, .hljs-symbol, .hljs-bullet { color: var(--meta); }
+.hljs-deletion { color: #b83d2e; }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 650; }
+
+html[data-tone="dark"] .hljs-keyword,
+html[data-tone="dark"] .hljs-selector-tag,
+html[data-tone="dark"] .hljs-literal,
+html[data-tone="dark"] .hljs-doctag { color: #d98fd0; }
+html[data-tone="dark"] .hljs-string,
+html[data-tone="dark"] .hljs-regexp,
+html[data-tone="dark"] .hljs-addition { color: #93d3a3; }
+html[data-tone="dark"] .hljs-number,
+html[data-tone="dark"] .hljs-variable,
+html[data-tone="dark"] .hljs-template-variable,
+html[data-tone="dark"] .hljs-type,
+html[data-tone="dark"] .hljs-attr,
+html[data-tone="dark"] .hljs-property { color: #e0b07a; }
+html[data-tone="dark"] .hljs-function .hljs-title,
+html[data-tone="dark"] .hljs-title.function_,
+html[data-tone="dark"] .hljs-title.class_,
+html[data-tone="dark"] .hljs-section,
+html[data-tone="dark"] .hljs-built_in { color: #8fb8e8; }
+html[data-tone="dark"] .hljs-deletion { color: #d96b5c; }
+
+/* ---------- 表格 ---------- */
+
+.desknote-table-scroll { overflow-x: auto; margin: 0 0 0.95em; }
+table { border-collapse: collapse; font-size: calc(var(--note-size) - 0.5px); }
+th, td { padding: 5px 10px; border-bottom: 1px solid var(--hairline); vertical-align: top; }
+th { font-weight: 650; color: var(--meta); text-align: left; }
+tbody tr:last-child td { border-bottom: 0; }
+
+/* ---------- 任务列表 ---------- */
+
+li.desknote-task { list-style: none; margin-left: -1.2em; }
+li.desknote-task > .desknote-box {
+  display: inline-block;
+  width: 1em;
+  margin-right: 0.3em;
+  text-align: center;
+  color: var(--accent);
+  font-weight: 600;
+}
+li.desknote-task.is-done > p, li.desknote-task.is-done { color: var(--meta); }
+li.desknote-task.is-done > p { text-decoration: line-through; text-decoration-color: var(--quote-bar); }
+
+/* ---------- callout ---------- */
+
+.desknote-callout {
+  margin: 0 0 0.9em;
+  padding: 8px 11px;
+  border-radius: 6px;
+  border-left: 2px solid currentColor;
+  background: color-mix(in srgb, currentColor 9%, var(--panel));
+}
+html[data-tone="dark"] .desknote-callout { background: color-mix(in srgb, currentColor 14%, var(--panel)); }
+.desknote-callout > .desknote-callout-title {
+  font-weight: 650;
+  margin: 0 0 0.35em;
+  line-height: 1.35;
+}
+.desknote-callout > .desknote-callout-body > :last-child { margin-bottom: 0; }
+.desknote-callout.is-foldable > .desknote-callout-title { cursor: default; }
+.desknote-callout.is-collapsed > .desknote-callout-body { display: none; }
+.desknote-callout.is-collapsed > .desknote-callout-title { margin-bottom: 0; }
+
+.desknote-callout[data-type="note"], .desknote-callout[data-type="abstract"],
+.desknote-callout[data-type="summary"], .desknote-callout[data-type="info"],
+.desknote-callout[data-type="tldr"] { color: #5b7590; }
+.desknote-callout[data-type="tip"], .desknote-callout[data-type="hint"],
+.desknote-callout[data-type="important"], .desknote-callout[data-type="success"],
+.desknote-callout[data-type="check"], .desknote-callout[data-type="done"] { color: #3d7869; }
+.desknote-callout[data-type="question"], .desknote-callout[data-type="help"],
+.desknote-callout[data-type="faq"], .desknote-callout[data-type="example"],
+.desknote-callout[data-type="quote"], .desknote-callout[data-type="cite"] { color: #7d5c86; }
+.desknote-callout[data-type="warning"], .desknote-callout[data-type="caution"],
+.desknote-callout[data-type="attention"], .desknote-callout[data-type="todo"] { color: #9e6108; }
+.desknote-callout[data-type="failure"], .desknote-callout[data-type="danger"],
+.desknote-callout[data-type="error"], .desknote-callout[data-type="bug"],
+.desknote-callout[data-type="missing"] { color: #b83d2e; }
+
+html[data-tone="dark"] .desknote-callout[data-type="note"],
+html[data-tone="dark"] .desknote-callout[data-type="abstract"],
+html[data-tone="dark"] .desknote-callout[data-type="summary"],
+html[data-tone="dark"] .desknote-callout[data-type="info"],
+html[data-tone="dark"] .desknote-callout[data-type="tldr"] { color: #8fa8c8; }
+html[data-tone="dark"] .desknote-callout[data-type="tip"],
+html[data-tone="dark"] .desknote-callout[data-type="hint"],
+html[data-tone="dark"] .desknote-callout[data-type="important"],
+html[data-tone="dark"] .desknote-callout[data-type="success"],
+html[data-tone="dark"] .desknote-callout[data-type="check"],
+html[data-tone="dark"] .desknote-callout[data-type="done"] { color: #5c9e8c; }
+html[data-tone="dark"] .desknote-callout[data-type="question"],
+html[data-tone="dark"] .desknote-callout[data-type="help"],
+html[data-tone="dark"] .desknote-callout[data-type="faq"],
+html[data-tone="dark"] .desknote-callout[data-type="example"],
+html[data-tone="dark"] .desknote-callout[data-type="quote"],
+html[data-tone="dark"] .desknote-callout[data-type="cite"] { color: #b48fc0; }
+html[data-tone="dark"] .desknote-callout[data-type="warning"],
+html[data-tone="dark"] .desknote-callout[data-type="caution"],
+html[data-tone="dark"] .desknote-callout[data-type="attention"],
+html[data-tone="dark"] .desknote-callout[data-type="todo"] { color: #e0913d; }
+html[data-tone="dark"] .desknote-callout[data-type="failure"],
+html[data-tone="dark"] .desknote-callout[data-type="danger"],
+html[data-tone="dark"] .desknote-callout[data-type="error"],
+html[data-tone="dark"] .desknote-callout[data-type="bug"],
+html[data-tone="dark"] .desknote-callout[data-type="missing"] { color: #d96b5c; }
+
+/* ---------- 脚注 ---------- */
+
+.footnotes {
+  margin-top: 2em;
+  padding-top: 0.8em;
+  border-top: 1px solid var(--hairline);
+  font-size: calc(var(--note-size) - 1px);
+  color: var(--meta);
+}
+.footnotes ol { padding-left: 1.4em; }
+.footnote-ref a { text-decoration: none; }
+.footnote-backref { text-decoration: none; }
+
+/* ---------- 公式 ---------- */
+
+.katex { font-size: 1.06em; }
+.katex-display { margin: 0.9em 0; overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
+.katex-error { color: #b83d2e; }
+html[data-tone="dark"] .katex-error { color: #d96b5c; }
+
+/* ---------- Mermaid ---------- */
+
+.desknote-mermaid {
+  margin: 0 0 1em;
+  padding: 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: var(--panel);
+  text-align: center;
+  overflow-x: auto;
+}
+.desknote-mermaid svg { max-width: 100%; height: auto; }
+.desknote-mermaid.is-error { text-align: left; color: #b83d2e; }
+.desknote-mermaid pre { margin: 0; white-space: pre-wrap; font-size: calc(var(--note-size) - 2px); }
+html[data-tone="dark"] .desknote-mermaid.is-error { color: #d96b5c; }
+
+/* ---------- 滚动条：贴着 App 的细线审美，不出现粗的 macOS 默认条 ---------- */
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--quote-bar);
+  border: 3px solid var(--panel);
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--meta); }
+
+::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); }

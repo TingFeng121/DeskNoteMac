@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-Hans" data-tone="light">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'none';
+  script-src 'self';
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' desknote-image: data: blob: https:;
+  font-src 'self';
+  connect-src 'none';
+  object-src 'none';
+  frame-src 'none';
+  base-uri 'none';
+  form-action 'none';">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeskNote</title>
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<link rel="stylesheet" href="renderer.css">
+</head>
+<body>
+<!--
+  正文容器。Swift 侧只认 #note-body 里的内容，不碰 document 其余部分。
+  脚本一律本地文件，顺序固定：解析 → 清洗 → 语言包 → 公式 → Mermaid → 我们自己的渲染。
+  Mermaid 带 defer：它 5.5 MB，不含流程图的文档不必等它解析完才能开始渲染。
+-->
+<main id="note-body" aria-live="polite"></main>
+<script src="vendor/markdown-it.min.js"></script>
+<script src="vendor/purify.min.js"></script>
+<script src="vendor/markdown-it-footnote.min.js"></script>
+<script src="vendor/highlight.min.js"></script>
+<script src="vendor/katex/katex.min.js"></script>
+<script src="vendor/katex/contrib/auto-render.min.js"></script>
+<script defer id="desknote-mermaid-script" src="vendor/mermaid/mermaid.min.js"></script>
+<script src="renderer.js"></script>
+</body>
+</html>

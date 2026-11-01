@@ -63,7 +63,8 @@ struct MarkdownEditor: NSViewRepresentable {
         tv.baseFontSize = CGFloat(fontSize)
         // 只有外部改了正文才回写（预览里点勾、恢复备份、换一张便签）。自己打字时两边恒等，
         // 一旦整段重设，插入点就会被弹到末尾——「按删除键光标跳到最后」正是这么来的。
-        if tv.string != text { tv.loadMarkdown(text) }
+        // 组字期间必须跳过：候选串已经在存储里，回写的还是组字前那份，一灌下去候选直接没了。
+        if tv.string != text, !tv.hasMarkedText() { tv.loadMarkdown(text) }
         if autoFocus, !context.coordinator.didFocus {
             context.coordinator.didFocus = true
             DispatchQueue.main.async { tv.window?.makeFirstResponder(tv) }
@@ -569,13 +570,27 @@ final class MarkdownTextView: NSTextView {
     // 撤销/重做可能只回滚字符串不滚属性，存储层一动就重新排版一次
     private var observesStorage = false
 
+    /// 存储层通知是在排版器处理这次编辑的中途回调回来的，那时候涂属性会把刚打进去的那几个字形一起作废：
+    /// 字明明在存储层里，却按 0.1pt 排，看着就是「打了字不上屏」。所以这条路径只能推到下一轮再排。
+    /// 打字本身有 `didChangeText` 同步排版兜底，不经过这里。
+    private var restylePending = false
+
+    private func scheduleRestyle() {
+        guard !restylePending else { return }
+        restylePending = true
+        DispatchQueue.main.async { [weak self] in
+            self?.restylePending = false
+            self?.restyle()
+        }
+    }
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         guard window != nil, !observesStorage, let storage = textStorage else { return }
         observesStorage = true
         NotificationCenter.default.addObserver(forName: NSTextStorage.didProcessEditingNotification,
                                                object: storage, queue: .main) { [weak self] _ in
-            self?.restyle()
+            self?.scheduleRestyle()
         }
     }
 }

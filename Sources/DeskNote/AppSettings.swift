@@ -52,6 +52,19 @@ final class AppSettings {
     var quickAddProjectID: String? { didSet {
         defaults.set(quickAddProjectID, forKey: "quickAddProjectID")
     } }
+    /// 库目录。没选过就是 `AppEnv.supportDir/vault`，这里只存用户显式挑过的那条路径
+    var vaultDirectory: String? { didSet { defaults.set(vaultDirectory, forKey: "vaultDirectory") } }
+    var libraryFilter: LibraryFilter { didSet { defaults.set(libraryFilter.rawValue, forKey: "libraryFilter") } }
+    /// 库表按哪一列排，存的是 `LibrarySortColumn.rawValue`
+    var librarySort: LibrarySortColumn { didSet {
+        defaults.set(librarySort.rawValue, forKey: "librarySort")
+    } }
+    /// 表头默认按更新时间倒序：库页第一件事是看出「刚刚哪份文件动了」
+    var libraryAscending: Bool { didSet { defaults.set(libraryAscending, forKey: "libraryAscending") } }
+    /// 预览抽屉：760 宽的窗口里抽屉一开表格只剩 390，收起按钮就放在过滤行最右
+    var libraryDrawerCollapsed: Bool { didSet {
+        defaults.set(libraryDrawerCollapsed, forKey: "libraryDrawerCollapsed")
+    } }
 
     // WebDAV 备份：密码不在这里，见 webdavPassword
     var webdavServer: String { didSet { defaults.set(webdavServer, forKey: "webdavServer") } }
@@ -86,6 +99,12 @@ final class AppSettings {
         webdavAutoBackup = defaults.object(forKey: "webdavAutoBackup") as? Bool ?? false
         webdavKeepCount = defaults.object(forKey: "webdavKeepCount") as? Int ?? 20
         quickAddProjectID = defaults.string(forKey: "quickAddProjectID")
+        vaultDirectory = defaults.string(forKey: "vaultDirectory")
+        libraryFilter = LibraryFilter(rawValue: defaults.string(forKey: "libraryFilter") ?? "") ?? .all
+        librarySort = LibrarySortColumn(rawValue: defaults.string(forKey: "librarySort") ?? "") ?? .updated
+        libraryAscending = defaults.bool(forKey: "libraryAscending")
+        // 默认展开：这一页是来看正文的，第一条永远选得中
+        libraryDrawerCollapsed = defaults.object(forKey: "libraryDrawerCollapsed") as? Bool ?? false
     }
 
     private func post(_ name: Notification.Name) {

@@ -5,8 +5,10 @@ struct SidebarView: View {
     @Environment(\.noteFontSize) private var fontSize
     @Binding var section: NoteSection
     private var store: Store { Store.shared }
+    private var library: LibraryModel { LibraryModel.shared }
 
     @State private var dropTarget: UUID?
+    @State private var hoveredChip: NoteSection?
 
     private static let palette: [Color] = [
         Color(red: 0.36, green: 0.62, blue: 0.55),
@@ -18,7 +20,8 @@ struct SidebarView: View {
     ]
 
     var body: some View {
-        VStack(spacing: 7) {
+        VStack(spacing: 6) {
+            // 软件自己的数据：便签 + 事项（全部/完成是事项的快捷视图）。和磁盘上的「库」分开成两层。
             chip("全部", count: store.openCount, tint: Color.accentColor, target: .all)
             chip("完成", count: store.doneCount, tint: .secondary, target: .done, symbol: "checkmark")
             chip("便签", count: store.notes.count, tint: NotePalette.color(0), target: .notes,
@@ -72,6 +75,7 @@ struct SidebarView: View {
                 }
                 .padding(.top, 2)
             }
+            .frame(maxHeight: .infinity)
             // 方块下方的空白 = 放到最后
             .dropDestination(for: String.self) { payloads, _ in
                 guard let id = payloads.compactMap(DragPayload.categoryID).first else { return false }
@@ -79,6 +83,13 @@ struct SidebarView: View {
                 dropTarget = nil
                 return true
             }
+
+            Divider().opacity(0.5)
+
+            // 库 = 磁盘上那一堆 .md，独立一层，不和便签/事项混在一起
+            chip("库", count: library.rows.count, tint: Self.palette[0], target: .library,
+                 symbol: "folder")
+                .help("库：磁盘上那一堆 .md 文件，Typora 和 Obsidian 也能直接改（⌘4）")
         }
         .padding(9)
         .frame(width: 72)
@@ -107,13 +118,18 @@ struct SidebarView: View {
         .foregroundStyle(selected ? Color.white : Color.primary)
         .frame(width: 54, height: 34)
         .background(
-            selected ? AnyShapeStyle(tint) : AnyShapeStyle(tint.opacity(0.22)),
+            selected ? AnyShapeStyle(tint)
+                     : AnyShapeStyle(tint.opacity(hoveredChip == target ? 0.36 : 0.22)),
             in: RoundedRectangle(cornerRadius: 9))
         .overlay(
             RoundedRectangle(cornerRadius: 9)
                 .strokeBorder(selected ? Color.primary.opacity(0.35) : .clear, lineWidth: 1.5))
         .contentShape(Rectangle())
         .onTapGesture { section = target }
+        // 用 onHover 不用 hoverEffect：这一格要能拖放，包一层 Button 会把 mouseDown 吃掉
+        .onHover { inside in
+            hoveredChip = inside ? target : (hoveredChip == target ? nil : hoveredChip)
+        }
         .help(full ?? title)
     }
 

@@ -19,6 +19,8 @@ final class Store {
     private var pendingSince: Date?
     /// 删除前的整盘快照，只保一步——够救「手滑删了整个类别」
     private var undoSnapshot: BoardData?
+    /// 同步进行中：采纳磁盘改动之后还要写一次 JSON，那次不该再触发一轮同步
+    private var mirroring = false
 
     /// 就地改名的认领信号：id 对上自己才响应。blank = 刚建出来，默认名不填进输入框。
     struct RenameRequest: Equatable {
@@ -62,6 +64,54 @@ final class Store {
         guard let raw = try? Data(contentsOf: Self.fileURL),
               let decoded = try? JSONDecoder().decode(BoardData.self, from: raw) else { return }
         data = decoded
+        normalizeItemTitles()
+        migrateNotesIfNeeded()
+    }
+
+    /// 便签统一收进 `<vault>/notes/` 子文件夹的一次性迁移（和库里真文档分干净、树里单独展示）。
+    /// 只在库已建起来（state.json 存在）时跑；把库根那一层的便签 .md 搬进 notes/，
+    /// 随后跑一次全量对账把 state.json 旧路径更正。库没建起来时 `activeRoot` 是 nil，这一格一次都不做。
+    private func migrateNotesIfNeeded() {
+        guard let root = VaultSync.activeRoot() else { return }
+        Vault.migrateNotesToFolder(root)
+        var incoming = data
+        _ = VaultSync.sync(data: &incoming, root: root, diskPaths: nil)
+        // 便签已搬进 notes/，全量对账把 state.json 旧路径更正；这一格只在库根有便签 .md 时
+        // 真正搬（搬完即空），所以是一次性落盘，不会每次启动都写。
+        data = incoming
+        save()
+    }
+
+    /// 一次性清理：早期版本把 Obsidian 的块引用（事项标题行尾的 ` ^UUID`）误存进了标题，
+    /// 阅读态会原样显示成「标题^UUID」。这里按「行尾紧跟一个 UUID」的精确形态剥掉，
+    /// 绝不误伤普通标题。清完落盘，之后同步层 readProject 本就会剥块引用，也不会再写回。
+    private func normalizeItemTitles() {
+        var changed = false
+        for ci in data.categories.indices {
+            for pi in data.categories[ci].projects.indices {
+                for ii in data.categories[ci].projects[pi].items.indices {
+                    let title = data.categories[ci].projects[pi].items[ii].title
+                    let cleaned = Self.strippedBlockID(title)
+                    if cleaned != title {
+                        data.categories[ci].projects[pi].items[ii].title = cleaned
+                        changed = true
+                    }
+                }
+            }
+        }
+        if changed { save() }
+    }
+
+    private static let blockIDPattern = try! NSRegularExpression(
+        pattern: #"\s*\^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$"#)
+
+    /// 剥掉标题行尾的 Obsidian 块引用（` ^UUID` 或 `^UUID`，有无前导空格都认）。
+    /// 非行尾、或不是标准 UUID 形态的，原样返回。
+    private static func strippedBlockID(_ title: String) -> String {
+        guard let m = blockIDPattern.firstMatch(in: title, range: NSRange(title.startIndex..., in: title)) else {
+            return title
+        }
+        return String(title.prefix(m.range.lowerBound)).trimmingCharacters(in: .whitespaces)
     }
 
     private func changed() {
@@ -101,11 +151,73 @@ final class Store {
     }
 
     func save() {
+        writeJSON()
+        pushToVault()
+    }
+
+    private func writeJSON() {
         guard let raw = try? JSONEncoder().encode(data) else { return }
         try? raw.write(to: Self.fileURL, options: .atomic)
         // 跟着数据一起落盘：崩在防抖里没写出去的话，流水号也不会凭空多走一格
         AppEnv.defaults.set(revision, forKey: "dataRevision")
     }
+
+    /// 库没建起来时 `activeRoot()` 是 nil，这里一次文件 IO 都不做；
+    /// 建起来之后每次存 data.json 顺手把这一盘镜像到 .md。
+    /// `mirroring` 挡的是再入：同步里采纳了磁盘改动会再写一次 JSON，那次不该再触发一轮同步。
+    ///
+    /// `diskPaths: []`：这一轮是 App 动了要写出去，磁盘上没有已知的改动，所以整库重走那 39 ms
+    /// 是白花——用户在编辑器里打字，每 0.4 秒付一次这种钱就是「卡」。
+    private func pushToVault() {
+        guard !mirroring, let root = VaultSync.activeRoot() else { return }
+        mirroring = true
+        defer { mirroring = false }
+        var incoming = data
+        let report = VaultSync.sync(data: &incoming, root: root, diskPaths: [])
+        if report.adopted > 0 {
+            data = incoming
+            writeJSON()
+        }
+        vaultReport = report.changed ? report : nil
+    }
+
+    /// 外部编辑器（Typora / Obsidian）动了文件：把磁盘那份收进来。
+    /// 采纳前留一步撤销点——整盘被外部改动覆盖是可撤销的，不是既成事实。
+    ///
+    /// `diskPaths`：事件报上来的那几条路径，nil 表示整库重走（冷启动、漏事件、用户手动刷新）。
+    @discardableResult
+    func pullFromVault(diskPaths: [String]? = nil) -> VaultSync.Report? {
+        guard let root = VaultSync.activeRoot() else { return nil }
+        var incoming = data
+        let report = VaultSync.sync(data: &incoming, root: root, diskPaths: diskPaths)
+        // 静默一轮就把上一轮的报告清掉：横幅不该挂着「刚才搬进回收站一份」不放。
+        // 报错那一种（problem）本身就算 changed，所以不会被这一行顺手抹掉。
+        vaultReport = report.changed ? report : nil
+        guard report.changed else { return nil }
+        if report.adopted > 0 {
+            takeUndoPoint()
+            data = incoming
+            revision += 1
+            writeJSON()
+            NotificationCenter.default.post(name: .storeDidChange, object: nil)
+            Notifier.sync(self)
+        }
+        vaultReport = report
+        return report
+    }
+
+    /// 换库目录时磁盘那份赢了：整盘采纳。留撤销点，理由和 pullFromVault 一样。
+    func replaceFromVault(_ incoming: BoardData) {
+        takeUndoPoint()
+        data = incoming
+        revision += 1
+        writeJSON()
+        NotificationCenter.default.post(name: .storeDidChange, object: nil)
+        Notifier.sync(self)
+    }
+
+    /// 最近一轮同步干了什么，供库页那条横幅说话；没有改动就是 nil
+    private(set) var vaultReport: VaultSync.Report?
 
     /// 从远端备份整盘恢复：先把本地这份复制成 data.json.bak，恢复错了还能手动回退
     func replaceAll(_ incoming: BoardData) {

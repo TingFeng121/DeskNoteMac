@@ -49,9 +49,40 @@ func confirmDelete(_ what: String, detail: String) -> Bool {
     return alert.runModal() == .alertFirstButtonReturn
 }
 
+/// 随外观切换的颜色：浅面板上压深，深面板上提亮。
+/// 系统 orange/red 直接写在 #F7F7F5 上只有 2.5:1，10pt 的字读不动；
+/// 同一支颜色当 3pt 高的图形用又太闷，所以字和条子共用这支「按外观算好的」。
+private func themedInk(light: (CGFloat, CGFloat, CGFloat), dark: (CGFloat, CGFloat, CGFloat)) -> NSColor {
+    NSColor(name: nil) { appearance in
+        let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        let rgb = isDark ? dark : light
+        return NSColor(srgbRed: rgb.0, green: rgb.1, blue: rgb.2, alpha: 1)
+    }
+}
+
+/// 网页读者（`LibraryRichReader`）那侧只认十六进制，得拿 NSColor 的原样按外观解一遍。
+/// 这几支就是它要的数，SwiftUI 那几支从这儿派生——两套深色不会各数各的。
+extension NSColor {
+    static let desknotePanelLight = NSColor(srgbRed: 0.97, green: 0.97, blue: 0.96, alpha: 1)
+    static let desknotePanelDark = NSColor(srgbRed: 0.11, green: 0.12, blue: 0.14, alpha: 1)
+    static let desknoteMetaInk = themedInk(light: (0.38, 0.38, 0.37), dark: (0.62, 0.63, 0.64))
+}
+
 extension Color {
-    static let panelDark = Color(red: 0.11, green: 0.12, blue: 0.14)
-    static let panelLight = Color(red: 0.97, green: 0.97, blue: 0.96)
+    static let panelDark = Color(nsColor: .desknotePanelDark)
+    static let panelLight = Color(nsColor: .desknotePanelLight)
+    /// 有一边改了、等你处理
+    static let warnInk = Color(nsColor: themedInk(light: (0.62, 0.38, 0.03),
+                                                  dark: (0.88, 0.57, 0.24)))
+    /// 两边都改了，冲突
+    static let alertInk = Color(nsColor: themedInk(light: (0.72, 0.24, 0.18),
+                                                   dark: (0.85, 0.42, 0.36)))
+    /// 已同步。边条那支青绿在浅底上只有 2.9:1，这里略压深一点
+    static let syncInk = Color(nsColor: themedInk(light: (0.24, 0.47, 0.41),
+                                                  dark: (0.36, 0.62, 0.55)))
+    /// 中性小字（列头、时间、目录、字数）。系统 `.secondary` 在 panelLight 上只有约 4.0:1，
+    /// `.tertiary` 更低到 2:1；10pt 的元数据要能读，就得自己定这两档。
+    static let metaInk = Color(nsColor: .desknoteMetaInk)
 }
 
 /// 内容帧尺寸：SwiftUI 根视图与 NSWindow 必须一致，否则 autosave 记住的旧尺寸会裁掉内容。

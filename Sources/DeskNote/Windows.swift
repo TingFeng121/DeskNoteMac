@@ -58,10 +58,10 @@ private func enforceContentMinSize(_ window: NSWindow, _ min: NSSize) {
     window.setFrame(newFrame, display: false)
 }
 
-/// 透明度每次都跟（那就是实时预览）；外观只在主题真的换了时才动。
+/// 桌面窗口的透明度实时跟随设置，主窗口固定不透明；外观只在主题变化时更新。
 /// 给窗口换 appearance 会让整棵视图树重算，拖一次不透明度滑块不该附带十几次全树重绘。
-func applyNoteWindowTheme(_ window: NSWindow) {
-    window.alphaValue = AppSettings.shared.opacity
+func applyNoteWindowTheme(_ window: NSWindow, allowsTransparency: Bool = true) {
+    window.alphaValue = allowsTransparency ? AppSettings.shared.opacity : 1
     let want: NSAppearance.Name = AppSettings.shared.theme == .dark ? .darkAqua : .aqua
     guard window.appearance?.name != want else { return }
     window.appearance = NSAppearance(named: want)
@@ -98,11 +98,11 @@ final class NoteWindowController: NSObject, NSWindowDelegate {
         window.contentView?.addSubview(host)
         host.frame = window.contentView?.bounds ?? .zero
         host.autoresizingMask = [.width, .height]
-        applyNoteWindowTheme(window)
+        applyNoteWindowTheme(window, allowsTransparency: false)
         NotificationCenter.default.addObserver(
             forName: .settingsChanged, object: nil, queue: .main) { [weak self] _ in
             guard let self else { return }
-            applyNoteWindowTheme(self.window)
+            applyNoteWindowTheme(self.window, allowsTransparency: false)
         }
     }
 

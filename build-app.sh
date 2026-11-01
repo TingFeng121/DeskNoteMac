@@ -18,6 +18,10 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/DeskNote"
 cp Info.plist "$APP/Contents/Info.plist"
 [ -f Resources/AppIcon.icns ] && cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+# 富渲染的前端资源整个目录照搬。不给 Package.swift 加 resources:——这个 .app 是脚本手装的，
+# SwiftPM 生成的 *_DeskNote.bundle 压根不会被拷进来，加那条只是第二条走不通的路。
+# 里面每个文件的版本和 SHA-256 钉在 MarkdownRenderer/VERSIONS.json，少一个文件阅读模式就退回原生读者。
+cp -R MarkdownRenderer "$APP/Contents/Resources/MarkdownRenderer"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 # 固定身份签名：ad-hoc 每次构建 cdhash 都变，钥匙串会反复要求重新授权（见 Tools/make-signing-identity.sh）
 SIGN_ID="${DESKNOTE_SIGN_ID:-DeskNote Local}"
