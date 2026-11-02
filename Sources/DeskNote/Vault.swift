@@ -287,6 +287,27 @@ enum Vault {
     private static let itemPattern = try! NSRegularExpression(
         pattern: #"^(\s*)-\s\[( |x|X)\]\s*(.*?)(?:\s*📅\s*(\d{4}-\d{2}-\d{2}))?(?:\s*(?:\^([0-9a-zA-Z-]{4,})|<!--\s*id:([0-9A-Fa-f-]{36})\s*-->))?\s*$"#)
 
+    /// 标题里不该出现身份锚点与 Obsidian Tasks 日期标记——它们是结构化字段，
+    /// 桌面面板（`Text(item.title)` 纯文本）会原样显示成「标题 <!-- id:UUID -->」「标题 📅 2026-11-03」。
+    /// 按固定形态把行尾的 HTML 注释身份、旧块引用身份、📅 日期剥干净；顺手去掉首尾控制字符
+    /// （早期版本误存过 `\u{10}` 之类的残留）。readProject 提取时即用，保证模型里的 title 永远干净；
+    /// 写回磁盘时再由 renderProject 重新补上 `<!-- id:UUID -->`，如此读写闭环互不污染。
+    private static let anchorPatterns: [NSRegularExpression] = [
+        try! NSRegularExpression(pattern: #"\s*<!--\s*id:[0-9A-Fa-f-]{36}\s*-->\s*$"#),
+        try! NSRegularExpression(pattern: #"\s*\^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\s*$"#),
+        try! NSRegularExpression(pattern: #"\s*📅\s*\d{4}-\d{2}-\d{2}\s*$"#),
+    ]
+
+    static func stripAnchor(_ title: String) -> String {
+        var t = title
+        for p in anchorPatterns {
+            if let m = p.firstMatch(in: t, range: NSRange(t.startIndex..., in: t)) {
+                t = String(t.prefix(m.range.lowerBound)).trimmingCharacters(in: .whitespaces)
+            }
+        }
+        return t.trimmingCharacters(in: CharacterSet.controlCharacters)
+    }
+
     static func renderProject(id: UUID, category: String, lines: [Line]) -> String {
         var front = Frontmatter()
         front["id"] = id.uuidString
@@ -336,7 +357,7 @@ enum Vault {
                 lines.append(.text(line))
                 continue
             }
-            var item = DeskItem(title: title)
+            var item = DeskItem(title: Self.stripAnchor(title))
             item.done = (group(2, of: line, in: match) ?? " ").lowercased() == "x"
             if let day = group(4, of: line, in: match) { item.deadline = dayOnly.date(from: day) }
             if let anchor = (group(5, of: line, in: match) ?? group(6, of: line, in: match)), let uuid = UUID(uuidString: anchor) { item.id = uuid }

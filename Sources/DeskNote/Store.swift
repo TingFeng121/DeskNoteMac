@@ -82,16 +82,17 @@ final class Store {
         save()
     }
 
-    /// 一次性清理：早期版本把 Obsidian 的块引用（事项标题行尾的 ` ^UUID`）误存进了标题，
-    /// 阅读态会原样显示成「标题^UUID」。这里按「行尾紧跟一个 UUID」的精确形态剥掉，
-    /// 绝不误伤普通标题。清完落盘，之后同步层 readProject 本就会剥块引用，也不会再写回。
+    /// 一次性清理：早期版本把身份锚点（`<!-- id:UUID -->` / 旧 `^UUID`）和 Obsidian Tasks 日期
+    /// （`📅 2026-11-03`）误存进了事项标题，桌面面板是纯文本 `Text(item.title)`，会原样显示成
+    /// 「标题 <!-- id:UUID -->」「标题 📅 2026-11-03」。这里交给 `Vault.stripAnchor` 按固定形态剥掉，
+    /// 绝不误伤普通标题。清完落盘；之后 readProject 提取时本就会 strip，也不会再写回。
     private func normalizeItemTitles() {
         var changed = false
         for ci in data.categories.indices {
             for pi in data.categories[ci].projects.indices {
                 for ii in data.categories[ci].projects[pi].items.indices {
                     let title = data.categories[ci].projects[pi].items[ii].title
-                    let cleaned = Self.strippedBlockID(title)
+                    let cleaned = Vault.stripAnchor(title)
                     if cleaned != title {
                         data.categories[ci].projects[pi].items[ii].title = cleaned
                         changed = true
@@ -100,18 +101,6 @@ final class Store {
             }
         }
         if changed { save() }
-    }
-
-    private static let blockIDPattern = try! NSRegularExpression(
-        pattern: #"\s*\^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$"#)
-
-    /// 剥掉标题行尾的 Obsidian 块引用（` ^UUID` 或 `^UUID`，有无前导空格都认）。
-    /// 非行尾、或不是标准 UUID 形态的，原样返回。
-    private static func strippedBlockID(_ title: String) -> String {
-        guard let m = blockIDPattern.firstMatch(in: title, range: NSRange(title.startIndex..., in: title)) else {
-            return title
-        }
-        return String(title.prefix(m.range.lowerBound)).trimmingCharacters(in: .whitespaces)
     }
 
     private func changed() {

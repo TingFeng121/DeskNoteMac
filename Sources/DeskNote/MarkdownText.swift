@@ -141,6 +141,9 @@ enum MarkdownText {
         if let r = t.range(of: #" ^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\s*$"#, options: .regularExpression) {
             t.removeSubrange(r)
         }
+        if let r = t.range(of: #"\s*📅\s*\d{4}-\d{2}-\d{2}\s*$"#, options: .regularExpression) {
+            t.removeSubrange(r)
+        }
         return t.trimmingCharacters(in: .whitespaces)
     }
 
