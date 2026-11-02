@@ -280,11 +280,12 @@ enum Vault {
         case text(String)
     }
 
-    /// 事项行：`- [ ] 标题 📅 2026-11-02 ^6C1A2B3D-...`。
+    /// 事项行：`- [ ] 标题 📅 2026-11-02 <!-- id:6C1A2B3D-... -->`。
     /// 日期只到「天」是 Obsidian Tasks 的约定，具体时刻另存 sidecar，别在行里塞 ISO 串碍眼。
-    /// 行尾的 `^` 是 Obsidian 原生的块引用，预览态不显示，正好拿来当事项身份。
+    /// 事项身份（item.id）放在行尾的 HTML 注释里——Obsidian 阅读模式不渲染 HTML 注释，
+    /// 所以用户看不到这串 UUID；正则同时兼容旧的 `^UUID` 块引用写法，旧文件也能照常读回。
     private static let itemPattern = try! NSRegularExpression(
-        pattern: #"^(\s*)-\s\[( |x|X)\]\s*(.*?)(?:\s*📅\s*(\d{4}-\d{2}-\d{2}))?(?:\s*\^([0-9a-zA-Z-]{4,}))?\s*$"#)
+        pattern: #"^(\s*)-\s\[( |x|X)\]\s*(.*?)(?:\s*📅\s*(\d{4}-\d{2}-\d{2}))?(?:\s*(?:\^([0-9a-zA-Z-]{4,})|<!--\s*id:([0-9A-Fa-f-]{36})\s*-->))?\s*$"#)
 
     static func renderProject(id: UUID, category: String, lines: [Line]) -> String {
         var front = Frontmatter()
@@ -303,7 +304,7 @@ enum Vault {
                     .trimmingCharacters(in: .whitespaces)
                 var out = "- [\(item.done ? "x" : " ")] \(title)"
                 if let deadline = item.deadline { out += " 📅 \(dayOnly.string(from: deadline))" }
-                out += " ^\(item.id.uuidString)"
+                out += " <!-- id:\(item.id.uuidString) -->"
                 body += out + "\n"
             }
         }
@@ -338,7 +339,7 @@ enum Vault {
             var item = DeskItem(title: title)
             item.done = (group(2, of: line, in: match) ?? " ").lowercased() == "x"
             if let day = group(4, of: line, in: match) { item.deadline = dayOnly.date(from: day) }
-            if let anchor = group(5, of: line, in: match), let uuid = UUID(uuidString: anchor) { item.id = uuid }
+            if let anchor = (group(5, of: line, in: match) ?? group(6, of: line, in: match)), let uuid = UUID(uuidString: anchor) { item.id = uuid }
             lines.append(.item(item))
         }
         return (id, front["category"] ?? "", lines)

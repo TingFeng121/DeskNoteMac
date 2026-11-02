@@ -106,8 +106,8 @@ enum MarkdownText {
         if t.hasPrefix("> ") { return .quote(text: String(t.dropFirst(2)), line: index) }
         if t == ">" { return .quote(text: "", line: index) }
         if let body = bulletBody(t) {
-            if body.hasPrefix("[ ] ") { return .todo(text: String(body.dropFirst(4)), done: false, line: index) }
-            if body.lowercased().hasPrefix("[x] ") { return .todo(text: String(body.dropFirst(4)), done: true, line: index) }
+            if body.hasPrefix("[ ] ") { return .todo(text: stripAnchor(String(body.dropFirst(4))), done: false, line: index) }
+            if body.lowercased().hasPrefix("[x] ") { return .todo(text: stripAnchor(String(body.dropFirst(4))), done: true, line: index) }
             return .bullet(text: body, line: index)
         }
         if let (marker, text) = numberedItem(t) { return .numbered(text: text, marker: marker, line: index) }
@@ -128,6 +128,20 @@ enum MarkdownText {
     private static func bulletBody(_ t: String) -> String? {
         for marker in ["- ", "* ", "+ "] where t.hasPrefix(marker) { return String(t.dropFirst(2)) }
         return nil
+    }
+
+    /// 事项文本行尾由 DeskNote 写入的身份标记，阅读态不该露出来——剥掉它：
+    /// 旧式 ` ^UUID`（Obsidian 块引用）或新式 ` <!-- id:UUID -->`（HTML 注释）。
+    /// 只认标准 UUID 格式（带横线的 8-4-4-4-12），不碰用户文档里手写的普通 `^短引用`。
+    private static func stripAnchor(_ text: String) -> String {
+        var t = text
+        if let r = t.range(of: #" <!--\s*id:[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\s*-->\s*$"#, options: .regularExpression) {
+            t.removeSubrange(r)
+        }
+        if let r = t.range(of: #" ^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\s*$"#, options: .regularExpression) {
+            t.removeSubrange(r)
+        }
+        return t.trimmingCharacters(in: .whitespaces)
     }
 
     private static func numberedItem(_ t: String) -> (String, String)? {
